@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Interaktywny konwerter DjVu -> PDF (wersja z obsługą Windows ddjvu.exe)
+Interaktywny konwerter DjVu -> PDF (wersja konsolowa).
+
+Ten skrypt pozwala użytkownikom na konwersję plików DjVu do formatu PDF
+przy użyciu narzędzia wiersza poleceń `ddjvu`. Jest zaprojektowany z myślą
+o łatwości obsługi i dobrze działa w systemie Windows, gdzie `ddjvu.exe` jest popularne.
 """
 
 import os
@@ -12,22 +16,25 @@ from pathlib import Path
 import shutil
 
 def znajdz_ddjvu():
-    """
-    Zwraca ścieżkę do ddjvu (może być 'ddjvu' lub pełna ścieżka do ddjvu.exe).
-    Sprawdza zmienną środowiskową DJVU_PATH, potem shutil.which('ddjvu') i shutil.which('ddjvu.exe').
-    Zwraca None jeśli nie znaleziono.
+    """Znajduje ścieżkę do pliku wykonywalnego ddjvu.
+
+    Sprawdza najpierw zmienną środowiskową DJVU_PATH. Jeśli nie zostanie znaleziona,
+    przeszukuje systemową zmienną PATH w poszukiwaniu 'ddjvu' lub 'ddjvu.exe'.
+
+    Zwraca:
+        str: Pełna ścieżka do pliku wykonywalnego ddjvu lub None, jeśli nie znaleziono.
     """
     env_path = os.environ.get('DJVU_PATH')
     if env_path:
         if os.path.isfile(env_path) and os.access(env_path, os.X_OK):
             return env_path
-        # jeśli podano katalog zamiast pliku, spróbuj ddjvu w tym katalogu
+        # Jeśli podano katalog, spróbuj znaleźć w nim ddjvu
         if os.path.isdir(env_path):
             candidate = os.path.join(env_path, 'ddjvu.exe' if os.name == 'nt' else 'ddjvu')
             if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
                 return candidate
 
-    # szukaj w PATH
+    # Szukaj w PATH
     for name in ('ddjvu', 'ddjvu.exe'):
         path = shutil.which(name)
         if path:
@@ -36,6 +43,14 @@ def znajdz_ddjvu():
     return None
 
 def znajdz_pliki_djvu(katalog):
+    """Znajduje wszystkie pliki DjVu w podanym katalogu.
+
+    Args:
+        katalog (str): Ścieżka do katalogu do przeszukania.
+
+    Zwraca:
+        list[str]: Posortowana lista ścieżek do znalezionych plików DjVu.
+    """
     wzorce = ['*.djvu', '*.djv', '*.DJVU', '*.DJV']
     pliki = []
     for wzorzec in wzorce:
@@ -43,21 +58,36 @@ def znajdz_pliki_djvu(katalog):
     return sorted(pliki)
 
 def wyswietl_pliki(pliki):
+    """Wyświetla numerowaną listę plików wraz z ich rozmiarami.
+
+    Args:
+        pliki (list[str]): Lista ścieżek plików do wyświetlenia.
+    """
     if not pliki:
         print("❌ Nie znaleziono plików DjVu w podanym katalogu.")
         return
     print(f"\n📁 Znaleziono {len(pliki)} plików DjVu:")
     print("-" * 60)
-    for i, plik in enumerate(pliki, 1):
-        nazwa = os.path.basename(plik)
+    for i, sciezka_pliku in enumerate(pliki, 1):
+        nazwa_pliku = os.path.basename(sciezka_pliku)
         try:
-            rozmiar = os.path.getsize(plik) / (1024 * 1024)
-            rozmiar_s = f"{rozmiar:.1f} MB"
+            rozmiar_mb = os.path.getsize(sciezka_pliku) / (1024 * 1024)
+            rozmiar_str = f"{rozmiar_mb:.1f} MB"
         except Exception:
-            rozmiar_s = "??"
-        print(f"{i:2d}. {nazwa} ({rozmiar_s})")
+            rozmiar_str = "??"
+        print(f"{i:2d}. {nazwa_pliku} ({rozmiar_str})")
 
 def wybierz_konkretne_pliki(pliki):
+    """Prosi użytkownika o wybranie konkretnych plików z listy po numerach.
+
+    Użytkownik może podać numery oddzielone przecinkami lub zakresy (np. "1,3,5-7").
+
+    Args:
+        pliki (list[str]): Lista plików do wyboru.
+
+    Zwraca:
+        list[str]: Lista ścieżek plików wybranych przez użytkownika.
+    """
     while True:
         wybor = input("\nPodaj numery plików (np. 1,3,5 lub 1-5): ").strip()
         try:
@@ -79,9 +109,17 @@ def wybierz_konkretne_pliki(pliki):
             else:
                 print(f"❌ Numery muszą być z zakresu 1-{len(pliki)}")
         except ValueError:
-            print("❌ Nieprawidłowy format. Użyj np. 1,3,5 lub 1-5")
+            print("❌ Nieprawidłowy format. Użyj numerów i zakresów (np. 1,3,5 lub 1-5).")
 
-def wybierz_pliki(pliki):
+def wybierz_pliki_do_konwersji(pliki):
+    """Umożliwia użytkownikowi wybór plików do konwersji.
+
+    Args:
+        pliki (list[str]): Lista dostępnych plików.
+
+    Zwraca:
+        list[str] | None: Lista wybranych ścieżek plików lub None, aby wrócić.
+    """
     while True:
         print("\n🔧 Opcje wyboru:")
         print("1. Wszystkie pliki")
@@ -98,6 +136,11 @@ def wybierz_pliki(pliki):
             print("❌ Nieprawidłowy wybór. Spróbuj ponownie.")
 
 def wybierz_jakosc():
+    """Prosi użytkownika o wybór jakości konwersji.
+
+    Zwraca:
+        str: Wybrany poziom jakości ('low', 'normal' lub 'high').
+    """
     print("\n🎨 Wybierz jakość konwersji:")
     print("1. Niska (szybka, mały rozmiar)")
     print("2. Normalna (zalecana)")
@@ -111,18 +154,32 @@ def wybierz_jakosc():
         elif wybor == '3':
             return 'high'
         else:
-            print("❌ Wybierz 1, 2 lub 3")
+            print("❌ Wybierz 1, 2 lub 3.")
 
-def konwertuj_plik(ddjvu_path, plik_djvu, katalog_wyjsciowy, jakosc='normal', timeout_s=300):
-    nazwa_bez_rozszerzenia = os.path.splitext(os.path.basename(plik_djvu))[0]
-    plik_pdf = os.path.join(katalog_wyjsciowy, f"{nazwa_bez_rozszerzenia}.pdf")
+def konwertuj_plik(sciezka_ddjvu, plik_djvu, katalog_wyjsciowy, jakosc='normal', timeout_s=300):
+    """Konwertuje pojedynczy plik DjVu do formatu PDF za pomocą narzędzia ddjvu.
+
+    Args:
+        sciezka_ddjvu (str): Ścieżka do pliku wykonywalnego ddjvu.
+        plik_djvu (str): Ścieżka do źródłowego pliku DjVu.
+        katalog_wyjsciowy (str): Katalog, w którym ma być zapisany przekonwertowany plik PDF.
+        jakosc (str, optional): Jakość konwersji.
+            Może być 'low', 'normal' lub 'high'. Domyślnie 'normal'.
+        timeout_s (int, optional): Timeout konwersji w sekundach.
+            Domyślnie 300.
+
+    Zwraca:
+        bool: True, jeśli konwersja się powiodła, w przeciwnym razie False.
+    """
+    nazwa_bazowa = os.path.splitext(os.path.basename(plik_djvu))[0]
+    plik_pdf = os.path.join(katalog_wyjsciowy, f"{nazwa_bazowa}.pdf")
     parametry_jakosci = {
         'low': ['-quality=25', '-smooth'],
         'normal': ['-quality=75'],
         'high': ['-quality=100', '-smooth']
     }
     params = parametry_jakosci.get(jakosc, ['-quality=75'])
-    cmd = [ddjvu_path, '-format=pdf'] + params + [plik_djvu, plik_pdf]
+    cmd = [sciezka_ddjvu, '-format=pdf'] + params + [plik_djvu, plik_pdf]
     print(f"🔄 Konwertuję: {os.path.basename(plik_djvu)} -> {os.path.basename(plik_pdf)}")
     try:
         wynik = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_s)
@@ -153,18 +210,19 @@ def konwertuj_plik(ddjvu_path, plik_djvu, katalog_wyjsciowy, jakosc='normal', ti
         return False
 
 def main():
+    """Główna funkcja uruchamiająca interaktywny konwerter DjVu na PDF."""
     print("=" * 60)
     print("🔄 KONWERTER DjVu → PDF (Windows-friendly)")
     print("=" * 60)
 
-    ddjvu_path = znajdz_ddjvu()
-    if not ddjvu_path:
+    sciezka_ddjvu = znajdz_ddjvu()
+    if not sciezka_ddjvu:
         print("❌ Nie znaleziono programu ddjvu.")
-        print("   - Dodaj ddjvu.exe do PATH lub ustaw zmienną środowiskową DJVU_PATH wskazującą na ddjvu.exe")
+        print("   - Dodaj ddjvu.exe do systemowej zmiennej PATH lub ustaw zmienną środowiskową DJVU_PATH.")
         print("   - Strona projektu: http://djvu.sourceforge.net/")
         sys.exit(1)
     else:
-        print(f"ℹ️  ddjvu wykryto: {ddjvu_path}")
+        print(f"ℹ️  Wykryto ddjvu: {sciezka_ddjvu}")
 
     while True:
         print(f"\n📂 Aktualny katalog: {os.getcwd()}")
@@ -183,7 +241,7 @@ def main():
             else:
                 break
 
-        wybrane_pliki = wybierz_pliki(pliki_djvu)
+        wybrane_pliki = wybierz_pliki_do_konwersji(pliki_djvu)
         if wybrane_pliki is None:
             continue
 
@@ -194,7 +252,6 @@ def main():
 
         jakosc = wybierz_jakosc()
 
-        # timeout
         try:
             timeout_s = int(input("\nTimeout konwersji w sekundach (Enter = 300): ").strip() or "300")
         except ValueError:
@@ -209,19 +266,19 @@ def main():
         if not input("\nRozpocząć konwersję? (t/n): ").lower().startswith('t'):
             continue
 
-        sukces = 0
-        bledy = 0
-        for plik in wybrane_pliki:
-            if konwertuj_plik(ddjvu_path, plik, katalog_wyjsciowy, jakosc, timeout_s):
-                sukces += 1
+        licznik_sukcesow = 0
+        licznik_bledow = 0
+        for sciezka_pliku in wybrane_pliki:
+            if konwertuj_plik(sciezka_ddjvu, sciezka_pliku, katalog_wyjsciowy, jakosc, timeout_s):
+                licznik_sukcesow += 1
             else:
-                bledy += 1
+                licznik_bledow += 1
 
         print("\n" + "=" * 60)
         print("📊 PODSUMOWANIE")
         print("=" * 60)
-        print(f"✅ Pomyślnie skonwertowano: {sukces}")
-        print(f"❌ Błędy: {bledy}")
+        print(f"✅ Pomyślnie skonwertowano: {licznik_sukcesow}")
+        print(f"❌ Błędy: {licznik_bledow}")
         print(f"📁 Pliki PDF zapisano w: {katalog_wyjsciowy}")
 
         if not input("\nKonwertować kolejne pliki? (t/n): ").lower().startswith('t'):
